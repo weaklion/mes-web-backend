@@ -16,3 +16,8 @@ spring:
 
 server:
   port: 8080
+
+mqtt:
+  url: tcp://localhost:1883
+  client-id: spring-mqtt-app
+  topic: "test/#"
