@@ -1,4 +1,4 @@
-package com.example.global.mqtt;
+package com.example.mesweb.global.mqtt;
 
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,10 +19,11 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
 
+import jakarta.annotation.PostConstruct;
 
 
 @Configuration
-public class mqttConfig {
+public class MqttConfig {
 	
 	@Value("${mqtt.url}")
 	private String mqttUrl;
@@ -32,10 +33,10 @@ public class mqttConfig {
 	
 	@Value("${mqtt.topic}")
 	private String topic;
-	
+
 	//클라이언트 팩토리
 	@Bean
-	public MqttPahoClientFactory mqttClientFactory() {
+	public MqttPahoClientFactory mqttClientFactory() {		
 		DefaultMqttPahoClientFactory factory = new DefaultMqttPahoClientFactory();
 		MqttConnectOptions options = new MqttConnectOptions();
 		options.setServerURIs(new String[]{mqttUrl});
@@ -44,7 +45,6 @@ public class mqttConfig {
 	}
 	
 	//채널 구성
-	
 	@Bean
 	@ServiceActivator(inputChannel = "mqttOutboundChannel")
 	public MessageHandler mqttOutBound() {
@@ -96,9 +96,7 @@ public class mqttConfig {
 	@ServiceActivator(inputChannel = "mqttInputChannel") 
 	public MessageHandler messageHandler() {
 		//broker -> inbound -> mqttInputChannel -> messageHandler
-		
 		return new MessageHandler() {
-			
 			@Override
 			public void handleMessage(Message<?> message) throws MessagingException {
 				System.out.println(message.getHeaders());
@@ -106,7 +104,5 @@ public class mqttConfig {
 				System.out.println("Payload: " + message.getPayload());
 			}
 		};
-		
 	}
-	
 }

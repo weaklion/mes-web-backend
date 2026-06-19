@@ -20,4 +20,4 @@ server:
 mqtt:
   url: tcp://localhost:1883
   client-id: spring-mqtt-app
-  topic: "test/#"
+  topic: "mes/#"

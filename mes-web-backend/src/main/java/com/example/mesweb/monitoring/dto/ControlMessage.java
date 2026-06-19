@@ -1,4 +1,4 @@
-package com.example.moniotoring.dto;
+package com.example.mesweb.monitoring.dto;
 
 public record ControlMessage(
         String clientId,

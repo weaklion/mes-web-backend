@@ -1,4 +1,4 @@
-package com.example.moniotoring;
+package com.example.mesweb.monitoring;
 
 public record MonitoringSummary(
         int schIdx,

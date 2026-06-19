@@ -1,4 +1,4 @@
-package com.example.schedule;
+package com.example.mesweb.schedule;
 
 import java.util.List;
 

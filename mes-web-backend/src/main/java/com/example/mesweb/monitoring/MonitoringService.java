@@ -1,4 +1,4 @@
-package com.example.moniotoring;
+package com.example.mesweb.monitoring;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -7,13 +7,13 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.example.moniotoring.dto.ControlMessage;
-import com.example.moniotoring.dto.InspectionResultRequest;
-import com.example.process.ProcessResult;
-import com.example.process.ProcessResultRepository;
-import com.example.schedule.Schedule;
-import com.example.schedule.ScheduleRepository;
-import com.example.setting.SettingRepository;
+import com.example.mesweb.monitoring.dto.ControlMessage;
+import com.example.mesweb.monitoring.dto.InspectionResultRequest;
+import com.example.mesweb.process.ProcessResult;
+import com.example.mesweb.process.ProcessResultRepository;
+import com.example.mesweb.schedule.Schedule;
+import com.example.mesweb.schedule.ScheduleRepository;
+import com.example.mesweb.setting.SettingRepository;
 
 
 

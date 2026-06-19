@@ -1,4 +1,4 @@
-package com.example.moniotoring;
+package com.example.mesweb.monitoring;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.moniotoring.dto.ControlMessage;
-import com.example.moniotoring.dto.InspectionResultRequest;
+import com.example.mesweb.monitoring.dto.ControlMessage;
+import com.example.mesweb.monitoring.dto.InspectionResultRequest;
 
 import jakarta.validation.Valid;
 

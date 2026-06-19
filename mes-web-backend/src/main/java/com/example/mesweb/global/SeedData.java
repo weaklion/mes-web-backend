@@ -1,4 +1,4 @@
-package com.example.global;
+package com.example.mesweb.global;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -7,10 +7,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import com.example.schedule.Schedule;
-import com.example.schedule.ScheduleRepository;
-import com.example.setting.Setting;
-import com.example.setting.SettingRepository;
+import com.example.mesweb.schedule.Schedule;
+import com.example.mesweb.schedule.ScheduleRepository;
+import com.example.mesweb.setting.Setting;
+import com.example.mesweb.setting.SettingRepository;
 
 @Configuration
 public class SeedData {
