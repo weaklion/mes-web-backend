@@ -8,8 +8,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.mesweb.inspection.dto.InspectionResultRequest;
 import com.example.mesweb.monitoring.dto.ControlMessage;
-import com.example.mesweb.monitoring.dto.InspectionResultRequest;
 
 import jakarta.validation.Valid;
 

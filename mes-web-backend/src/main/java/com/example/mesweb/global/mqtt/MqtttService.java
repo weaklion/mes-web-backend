@@ -12,7 +12,7 @@ public class MqtttService {
 	private final MqttConfig.myGateWay myGateWay;
 	
 	
-	public void process() {
+	public void publish() {
 		String msg = "hello mqtt";
 		myGateWay.sendToMqtt(msg);
 	}

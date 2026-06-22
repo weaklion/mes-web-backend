@@ -16,8 +16,8 @@ import lombok.Getter;
 public class ProcessResult {
 	@Id
 	@GeneratedValue(strategy =GenerationType.IDENTITY )
-	private Integer prcIdx; //공정처리 번호
-	private Integer schIdx; //공정 결과 번호
+	private Integer prcIdx;
+	private Integer schIdx; //공정 계획 번호
 	private String prcCd; //공정처리 코드
 	private LocalDate prcDate; //공정 처리일
 	private Integer prcLoadTime; // 처리 시간

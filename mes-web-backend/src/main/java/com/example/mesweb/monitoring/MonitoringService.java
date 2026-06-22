@@ -7,8 +7,9 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.mesweb.inspection.dto.InspectionMessage;
+import com.example.mesweb.inspection.dto.InspectionResultRequest;
 import com.example.mesweb.monitoring.dto.ControlMessage;
-import com.example.mesweb.monitoring.dto.InspectionResultRequest;
 import com.example.mesweb.process.ProcessResult;
 import com.example.mesweb.process.ProcessResultRepository;
 import com.example.mesweb.schedule.Schedule;
@@ -87,5 +88,22 @@ public class MonitoringService {
                  ok
          );
          return processResultRepository.save(processResult);
+    }
+    
+    @Transactional
+    public void process(String topic,InspectionMessage message) {
+    	Schedule schedule = scheduleRepository.findById(message.scheduleId()).orElseThrow(() -> new IllegalArgumentException("공정계획을 찾을 수 없습니다."));
+    	boolean success = "OK".equalsIgnoreCase(message.result());
+    	
+    	ProcessResult processResult = new ProcessResult(
+    			  schedule.getSchIdx(),              // schIdx
+    			    message.eventId(),                 // prcCd
+    			    message.inspectedAt().toLocalDate(), // prcDate
+    			    schedule.getLoadTime(),            // prcLoadTime
+    			    message.facilityId(),              // prcFacilityId
+    			    success                            // prcResult
+    			   );
+    	
+    	processResultRepository.save(processResult);
     }
 }

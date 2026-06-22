@@ -1,4 +1,4 @@
-package com.example.mesweb.monitoring.dto;
+package com.example.mesweb.inspection.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

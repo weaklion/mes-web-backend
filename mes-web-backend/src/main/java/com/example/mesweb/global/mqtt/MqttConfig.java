@@ -19,7 +19,12 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
 
+import com.example.mesweb.inspection.InspectionService;
+import com.example.mesweb.inspection.dto.InspectionMessage;
+
 import jakarta.annotation.PostConstruct;
+import tools.jackson.databind.ObjectMapper;
+
 
 
 @Configuration
@@ -94,15 +99,25 @@ public class MqttConfig {
 
 	@Bean
 	@ServiceActivator(inputChannel = "mqttInputChannel") 
-	public MessageHandler messageHandler() {
+	public MessageHandler messageHandler(ObjectMapper objectMapper,InspectionService inspectionService) {
 		//broker -> inbound -> mqttInputChannel -> messageHandler
-		return new MessageHandler() {
-			@Override
-			public void handleMessage(Message<?> message) throws MessagingException {
-				System.out.println(message.getHeaders());
-				System.out.println("Topic: " + message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC));
-				System.out.println("Payload: " + message.getPayload());
-			}
+		return message -> {
+			try {
+				String topic = message.getHeaders().get(MqttHeaders.RECEIVED_TOPIC, String.class);
+				
+				String payload = message.getPayload().toString();
+				
+				// json 문자열을 객체로 변환 
+				InspectionMessage inspectionMessage = objectMapper.readValue(payload, InspectionMessage.class);
+				
+				inspectionService.process(topic, inspectionMessage);
+			} catch (Exception e) {
+	            throw new IllegalArgumentException(
+	                    "MQTT 메시지 변환 실패",
+	                    e
+	            );
+	        }
 		};
+
 	}
 }
