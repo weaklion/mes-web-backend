@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.mesweb.inspection.dto.InspectionMessage;
 import com.example.mesweb.inspection.dto.InspectionResultRequest;
 import com.example.mesweb.monitoring.dto.ControlMessage;
+import com.example.mesweb.monitoring.dto.MonitoringSummary;
 import com.example.mesweb.process.ProcessResult;
 import com.example.mesweb.process.ProcessResultRepository;
 import com.example.mesweb.schedule.Schedule;

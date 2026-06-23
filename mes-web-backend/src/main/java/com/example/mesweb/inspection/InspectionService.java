@@ -4,6 +4,8 @@ import org.springframework.stereotype.Service;
 
 import com.example.mesweb.inspection.dto.InspectionMessage;
 import com.example.mesweb.monitoring.MonitoringService;
+import com.example.mesweb.monitoring.MonitoringSseService;
+import com.example.mesweb.monitoring.dto.MonitoringSummary;
 import com.example.mesweb.process.ProcessResult;
 import com.example.mesweb.process.ProcessResultRepository;
 import com.example.mesweb.schedule.Schedule;
@@ -19,6 +21,7 @@ public class InspectionService {
     private final ScheduleRepository scheduleRepository;
     private final ProcessResultRepository processResultRepository;
     private final MonitoringService monitoringService;
+    private final MonitoringSseService monitoringSseService;
     
     @Transactional
     public void process(String topic,InspectionMessage message) {
@@ -33,7 +36,15 @@ public class InspectionService {
     			    message.facilityId(),              // prcFacilityId
     			    success                            // prcResult
     			   );
-    	
+    	    	
     	processResultRepository.save(processResult);
+    	
+    	MonitoringSummary summary = monitoringService.summary(message.scheduleId());
+    	
+    	monitoringSseService.sendInspectionResult(
+    		    message.scheduleId(),
+    		    summary
+    		);
+
     }
 }
