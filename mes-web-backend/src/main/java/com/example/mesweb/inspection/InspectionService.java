@@ -23,28 +23,27 @@ public class InspectionService {
     private final MonitoringService monitoringService;
     private final MonitoringSseService monitoringSseService;
     
-    @Transactional
-    public void process(String topic,InspectionMessage message) {
-    	Schedule schedule = scheduleRepository.findById(message.scheduleId()).orElseThrow(() -> new IllegalArgumentException("공정계획을 찾을 수 없습니다."));
-    	boolean success = "OK".equalsIgnoreCase(message.result());
-    	
-    	ProcessResult processResult = new ProcessResult(
-    			  schedule.getSchIdx(),              // schIdx
-    			    message.eventId(),                 // prcCd
-    			    message.inspectedAt().toLocalDate(), // prcDate
-    			    schedule.getLoadTime(),            // prcLoadTime
-    			    message.facilityId(),              // prcFacilityId
-    			    success                            // prcResult
-    			   );
-    	    	
-    	processResultRepository.save(processResult);
-    	
-    	MonitoringSummary summary = monitoringService.summary(message.scheduleId());
-    	
-    	monitoringSseService.sendInspectionResult(
-    		    message.scheduleId(),
-    		    summary
-    		);
 
+    public void process(String topic,InspectionMessage message) {
+    	   validateTopic(topic, message);
+
+           monitoringService.saveInspectionResult(message);
+
+           MonitoringSummary summary = monitoringService.summary(message.scheduleId());
+
+           monitoringSseService.sendMonitoringSummary(
+                   message.scheduleId(),
+                   summary
+           );
+
+    }
+    
+    private void validateTopic(String topic, InspectionMessage message) {
+    	String expectedTopic = "mes/%s/%s/inspection"
+    			.formatted(message.plantCode(), message.facilityId());
+    	
+    	if(!expectedTopic.equals(topic)) {
+    		throw new IllegalArgumentException( "MQTT topic mismatch. topic=" + topic + ", expected=" + expectedTopic);
+    	}
     }
 }

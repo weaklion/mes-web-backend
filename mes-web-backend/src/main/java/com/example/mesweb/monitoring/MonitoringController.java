@@ -29,23 +29,19 @@ public class MonitoringController {
 	    }
 	    
 	    @GetMapping("/monitoring/{schIdx}")
-	    public MonitoringSummary summary(@PathVariable int schIdx) {
+	    public MonitoringSummary summary(@PathVariable("schIdx") int schIdx) {
 	        return monitoringService.summary(schIdx);
 	    }
 
 	    @PostMapping("/monitoring/{schIdx}/start")
-	    public ControlMessage start(@PathVariable int schIdx) {
+	    public ControlMessage start(@PathVariable("schIdx") int schIdx) {
 	        return monitoringService.start(schIdx);
 	    }
 
-	    @PostMapping("/simulator/inspection-results")
-	    public MonitoringSummary inspectionResult(@Valid @RequestBody InspectionResultRequest request) {
-	        monitoringService.saveInspectionResult(request);
-	        return monitoringService.summary(request.schIdx());
-	    }
-	    
+
+//	    
 	    @GetMapping(value = "/monitoring/{schIdx}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	    public SseEmitter subscribe(@PathVariable int schIdx) {
+	    public SseEmitter subscribe(@PathVariable("schIdx") int schIdx) {
 	        return monitoringSseService.subscribe(schIdx);
 	    }
 

@@ -75,19 +75,21 @@ public class MonitoringService {
     }
     
     @Transactional
-    public ProcessResult saveInspectionResult(InspectionResultRequest request) {
-    	 Schedule schedule = scheduleRepository.findById(request.schIdx())
-                 .orElseThrow(() -> new IllegalArgumentException("Schedule not found: " + request.schIdx()));
-         boolean ok = "OK".equalsIgnoreCase(request.result());
-         String prcCd = DateTimeFormatter.BASIC_ISO_DATE.format(schedule.getSchDate()) + "-" + UUID.randomUUID();
+    public ProcessResult saveInspectionResult(InspectionMessage message) {
+    	   Schedule schedule = scheduleRepository.findById(message.scheduleId())
+    	            .orElseThrow(() -> new IllegalArgumentException(
+    	                    "Schedule not found: " + message.scheduleId()
+    	            ));
+         boolean ok = "OK".equalsIgnoreCase(message.result());
          ProcessResult processResult = new ProcessResult(
                  schedule.getSchIdx(),
-                 prcCd,
-                 schedule.getSchDate(),
+                 message.eventId(),
+                 message.inspectedAt().toLocalDate(),
                  schedule.getLoadTime(),
-                 schedule.getSchFacilityId(),
+                 message.facilityId(),
                  ok
          );
+
          return processResultRepository.save(processResult);
     }
     
