@@ -6,31 +6,21 @@ import com.example.mesweb.inspection.dto.InspectionMessage;
 import com.example.mesweb.monitoring.MonitoringService;
 import com.example.mesweb.monitoring.MonitoringSseService;
 import com.example.mesweb.monitoring.dto.MonitoringSummary;
-import com.example.mesweb.process.ProcessResult;
-import com.example.mesweb.process.ProcessResultRepository;
-import com.example.mesweb.schedule.Schedule;
-import com.example.mesweb.schedule.ScheduleRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
 public class InspectionService {
 
-    private final ScheduleRepository scheduleRepository;
-    private final ProcessResultRepository processResultRepository;
     private final MonitoringService monitoringService;
     private final MonitoringSseService monitoringSseService;
     
 
     public void process(String topic,InspectionMessage message) {
     	   validateTopic(topic, message);
-
            monitoringService.saveInspectionResult(message);
-
            MonitoringSummary summary = monitoringService.summary(message.scheduleId());
-
            monitoringSseService.sendMonitoringSummary(
                    message.scheduleId(),
                    summary

@@ -1,25 +1,118 @@
-# MES Web Backend
+# MES IoT Monitoring Project
 
-Spring Boot 기반의 MES 공정 모니터링 백엔드입니다.
+Spring Boot, PostgreSQL, MQTT, SSE, Vue 3를 사용한 MES/IoT 토이 프로젝트입니다.
 
-가상 생산 라인의 생산 계획, 기준정보, 검사 결과를 관리하고, MQTT로 들어오는 설비 검사 데이터를 받아 DB에 저장하는 구조를 목표로 합니다. 프론트엔드는 Vue 개발 서버에서 REST API를 호출해 모니터링 데이터를 조회합니다.
+가상 설비에서 발생한 검사 결과를 MQTT 메시지로 처리하고, 백엔드가 이를 저장한 뒤 SSE(Server-Sent Events)로 프론트 모니터링 화면을 실시간 갱신합니다.
+
+## 프로젝트 목표
+
+이 프로젝트의 핵심 목표는 다음 흐름을 구현하는 것입니다.
+
+```text
+Vue Line Simulator
+-> Spring simulator API
+-> MQTT publish
+-> Mosquitto Broker
+-> Spring MQTT subscriber
+-> InspectionMessage 변환
+-> MonitoringService.saveInspectionResult()
+-> ProcessResult PostgreSQL 저장
+-> MonitoringSummary 생성
+-> SSE publish
+-> Vue Dashboard 실시간 갱신
+```
+
+MQTT Explorer를 사용해 직접 MQTT 메시지를 발행해도 같은 수신 흐름을 테스트할 수 있습니다.
 
 ## 기술 스택
 
+### Backend
+
 - Java 21
 - Spring Boot 4.1.0
-- Spring Web
-- Spring Web MVC
+- Spring Web / Spring MVC
 - Spring Data JPA
 - Spring Validation
-- Spring Integration
 - Spring Integration MQTT
 - Eclipse Paho MQTT Client
 - PostgreSQL
 - Lombok
-- Gradle
+- Gradle / STS
 
-## 프로젝트 구조
+### Frontend
+
+- Vue 3
+- TypeScript
+- axios
+- Tailwind CSS
+- Vite
+- EventSource(SSE)
+
+### Infra
+
+- Mosquitto MQTT Broker
+- PostgreSQL
+- MQTT Explorer(optional)
+
+## 주요 흐름
+
+### 1. 프론트 시뮬레이터 흐름
+
+Vue 대시보드의 `Start` 버튼을 누르면 Line Simulator가 반복 실행됩니다.
+
+```text
+Start 클릭
+-> /api/monitoring/{schIdx}/start
+-> loadTime 동안 moving 상태
+-> /api/simulator/inspection-results/mqtt
+-> Spring MQTT publish
+-> Mosquitto Broker
+-> Spring MQTT subscriber 재수신
+-> DB 저장
+-> SSE로 Vue 갱신
+```
+
+`Stop` 버튼을 누르면 프론트의 반복 타이머가 종료되고 더 이상 검사 이벤트를 발행하지 않습니다.
+
+### 2. MQTT Explorer 테스트 흐름
+
+MQTT Explorer에서 직접 topic과 payload를 발행할 수도 있습니다.
+
+topic:
+
+```text
+mes/PLT01/FAC01/inspection
+```
+
+payload:
+
+```json
+{
+  "eventId": "EVT-001",
+  "scheduleId": 1,
+  "clientId": "IOT01",
+  "plantCode": "PLT01",
+  "facilityId": "FAC01",
+  "result": "OK",
+  "inspectedAt": "2026-07-01T14:30:00+09:00"
+}
+```
+
+백엔드는 topic과 payload의 `plantCode`, `facilityId`가 일치하는지 검증한 뒤 저장합니다.
+
+### 3. SSE 실시간 갱신 흐름
+
+프론트는 모니터링 화면 진입 시 SSE에 연결합니다.
+
+```text
+GET /api/monitoring/{schIdx}/events
+```
+
+백엔드는 검사 결과 저장 후 최신 `MonitoringSummary`를 `monitoring-summary` 이벤트로 전송합니다.
+
+프론트는 이 이벤트를 받아 OK/FAIL 수량, 성공률, 생산 현황을 갱신합니다.
+
+## 백엔드 구조
 
 ```text
 src/main/java/com/example/mesweb
@@ -31,14 +124,16 @@ src/main/java/com/example/mesweb
 ├─ inspection
 │  ├─ InspectionService.java
 │  └─ dto
-│     ├─ InspectionMessage.java
-│     └─ InspectionResultRequest.java
+│     └─ InspectionMessage.java
 ├─ monitoring
 │  ├─ MonitoringController.java
 │  ├─ MonitoringService.java
-│  ├─ MonitoringSummary.java
+│  ├─ MonitoringSseService.java
+│  ├─ SimulatorService.java
 │  └─ dto
-│     └─ ControlMessage.java
+│     ├─ ControlMessage.java
+│     ├─ MonitoringSummary.java
+│     └─ SimulatorInspectionRequest.java
 ├─ process
 │  ├─ ProcessResult.java
 │  └─ ProcessResultRepository.java
@@ -52,96 +147,43 @@ src/main/java/com/example/mesweb
    └─ SettingRepository.java
 ```
 
-현재 구조는 도메인별 패키지 방식입니다. 예를 들어 `schedule` 패키지 안에는 생산 계획 엔티티, 컨트롤러, 레포지터리가 함께 들어 있습니다.
+## 주요 클래스 역할
 
-## 핵심 흐름
+### `MqttConfig`
 
-### 1. 모니터링 조회
+- MQTT inbound/outbound 채널 설정
+- `mes/+/+/inspection` topic 구독
+- MQTT payload를 `InspectionMessage`로 변환
+- `InspectionService.process()` 호출
 
-```text
-Vue Frontend
-→ GET /api/monitoring/{schIdx}
-→ MonitoringController
-→ MonitoringService.summary()
-→ ScheduleRepository / SettingRepository / ProcessResultRepository
-→ MonitoringSummary 응답
-```
+### `MqtttService`
 
-`MonitoringService.summary()`는 특정 생산 계획 번호(`schIdx`)를 기준으로 계획 정보, 공장명, 설비명, 검사 성공 수, 검사 실패 수, 성공률을 계산해서 반환합니다.
+- 백엔드에서 MQTT 메시지를 발행하는 서비스
+- 프론트 시뮬레이터 요청을 실제 MQTT 메시지로 publish
 
-### 2. REST 검사 결과 저장
+### `SimulatorService`
 
-```text
-Vue Frontend 또는 REST 테스트 도구
-→ POST /api/simulator/inspection-results
-→ MonitoringController
-→ MonitoringService.saveInspectionResult()
-→ ProcessResult 저장
-→ 최신 MonitoringSummary 응답
-```
+- 프론트 시뮬레이터 요청을 받아 `InspectionMessage` 생성
+- schedule 기준으로 `plantCode`, `facilityId`를 채움
+- `MqtttService`를 통해 MQTT 발행
 
-이 방식은 MQTT 없이 HTTP 요청으로 검사 결과를 저장할 때 사용합니다.
+### `InspectionService`
 
-### 3. MQTT 검사 결과 저장
+- MQTT로 수신된 검사 메시지 처리
+- topic과 payload의 설비 정보 검증
+- `MonitoringService.saveInspectionResult()` 호출
+- 저장 후 `MonitoringSseService.sendMonitoringSummary()` 호출
 
-```text
-MQTT Explorer 또는 가상 설비
-→ MQTT Broker
-→ MqttConfig.inbound()
-→ mqttInputChannel
-→ MqttConfig.messageHandler()
-→ InspectionMessage 변환
-→ InspectionService.process()
-→ ProcessResult 저장
-```
+### `MonitoringService`
 
-MQTT payload는 `InspectionMessage` DTO로 변환됩니다. 이후 `InspectionService`에서 생산 계획을 조회하고 검사 결과를 `processes` 테이블에 저장합니다.
+- 모니터링 요약 조회
+- 검사 결과를 `ProcessResult`로 저장
 
-## 도메인 설명
+### `MonitoringSseService`
 
-### Setting
-
-공장, 설비 같은 기준정보입니다.
-
-| 필드 | 의미 |
-| --- | --- |
-| `basicCode` | 기준정보 코드. 예: `PLT01`, `FAC01` |
-| `codeName` | 기준정보 이름 |
-| `codeDesc` | 기준정보 설명 |
-| `regDt` | 등록일시 |
-| `modDt` | 수정일시 |
-
-### Schedule
-
-생산 계획입니다.
-
-| 필드 | 의미 |
-| --- | --- |
-| `schIdx` | 생산 계획 번호. DB에서 자동 증가 |
-| `plantCode` | 공장 코드 |
-| `schDate` | 생산 계획일 |
-| `loadTime` | 제품 처리 시간 |
-| `schStartTime` | 계획 시작 시간 |
-| `schEndTime` | 계획 종료 시간 |
-| `schFacilityId` | 처리 설비 코드 |
-| `schAmount` | 목표 생산 수량 |
-| `regDt` | 등록일시 |
-| `modDt` | 수정일시 |
-
-### ProcessResult
-
-실제 공정 검사 결과입니다.
-
-| 필드 | 의미 |
-| --- | --- |
-| `prcIdx` | 공정 처리 번호. DB에서 자동 증가 |
-| `schIdx` | 연결된 생산 계획 번호 |
-| `prcCd` | 공정 처리 코드. MQTT에서는 `eventId`를 저장 |
-| `prcDate` | 공정 처리일 |
-| `prcLoadTime` | 처리 시간 |
-| `prcFacilityId` | 처리 설비 코드 |
-| `prcResult` | 검사 결과. `true`는 OK, `false`는 FAIL |
-| `regDt` | 결과 저장일시 |
+- schIdx별 SSE 연결 관리
+- 여러 브라우저 탭이 같은 schIdx를 구독할 수 있도록 `Map<Integer, List<SseEmitter>>` 사용
+- `monitoring-summary` 이벤트 전송
 
 ## 주요 API
 
@@ -151,15 +193,11 @@ MQTT payload는 `InspectionMessage` DTO로 변환됩니다. 이후 `InspectionSe
 GET /api/settings
 ```
 
-공장, 설비 기준정보 목록을 조회합니다.
-
-### 생산 계획 조회
+### 생산계획 조회
 
 ```http
 GET /api/schedules
 ```
-
-생산 계획 목록을 조회합니다.
 
 ### 모니터링 요약 조회
 
@@ -167,7 +205,7 @@ GET /api/schedules
 GET /api/monitoring/{schIdx}
 ```
 
-예시:
+예:
 
 ```http
 GET /api/monitoring/1
@@ -179,91 +217,86 @@ GET /api/monitoring/1
 POST /api/monitoring/{schIdx}/start
 ```
 
-예시:
-
-```http
-POST /api/monitoring/1/start
-```
-
-응답 예시:
+응답 예:
 
 ```json
 {
   "clientId": "MON01",
   "plantCode": "PLT01",
   "facilityId": "FAC01",
-  "timestamp": "2026-06-26 14:30:00",
+  "timestamp": "2026-07-01 14:30:00",
   "flag": "ON"
 }
 ```
 
-현재는 공정 시작용 제어 메시지를 생성하는 단계입니다.
-
-### REST 검사 결과 저장
+### 프론트 시뮬레이터 MQTT 발행
 
 ```http
-POST /api/simulator/inspection-results
+POST /api/simulator/inspection-results/mqtt
 Content-Type: application/json
 ```
 
-요청 예시:
+요청 예:
 
 ```json
 {
-  "schIdx": 1,
+  "scheduleId": 1,
   "clientId": "IOT01",
-  "result": "OK",
-  "timestamp": "2026-06-26T14:30:00+09:00"
+  "result": "OK"
 }
 ```
 
-응답은 저장 후 최신 모니터링 요약입니다.
-
-## MQTT 설정
-
-MQTT 설정은 `src/main/resources/application.yml`에 있습니다.
-
-```yaml
-mqtt:
-  url: tcp://localhost:1883
-  client-id: spring-mqtt-app
-  topic: "mes/#"
-```
-
-현재 설정은 `mes/#` 아래의 모든 토픽을 구독합니다.
-
-공장/설비/검사 토픽만 받고 싶다면 아래처럼 좁힐 수 있습니다.
-
-```yaml
-mqtt:
-  topic: "mes/+/+/inspection"
-```
-
-토픽 예시:
-
-```text
-mes/PLT01/FAC01/inspection
-```
-
-MQTT Explorer에서 보낼 payload 예시:
+응답 예:
 
 ```json
 {
-  "eventId": "EVT-20260626-001",
+  "eventId": "EVT-5d0f8b51-3f8e-4bb2-9127-a6328f7b6b89",
   "scheduleId": 1,
   "clientId": "IOT01",
   "plantCode": "PLT01",
   "facilityId": "FAC01",
   "result": "OK",
-  "inspectedAt": "2026-06-26T14:30:00+09:00"
+  "inspectedAt": "2026-07-01T14:30:00+09:00"
 }
 ```
 
-`InspectionMessage`의 필드명과 JSON key가 같아야 합니다.
+이 API는 DB에 직접 저장하지 않습니다. MQTT로 publish한 뒤, 같은 백엔드의 MQTT subscriber가 다시 수신하여 저장합니다.
+
+### SSE 연결
+
+```http
+GET /api/monitoring/{schIdx}/events
+```
+
+이벤트 이름:
+
+```text
+connected
+monitoring-summary
+```
+
+## MQTT 설정
+
+`src/main/resources/application.yml`
+
+```yaml
+mqtt:
+  url: tcp://localhost:1883
+  client-id: spring-mqtt-app
+  topic: "mes/+/+/inspection"
+```
+
+백엔드는 다음 topic 패턴만 구독합니다.
+
+```text
+mes/{plantCode}/{facilityId}/inspection
+```
+
+outbound clientId는 inbound와 충돌하지 않도록 `spring-mqtt-app-outbound` 형태로 분리했습니다.
 
 ## PostgreSQL 설정
 
-현재 DB 설정은 PostgreSQL 기준입니다.
+`src/main/resources/application.yml`
 
 ```yaml
 spring:
@@ -281,29 +314,21 @@ spring:
       hibernate:
         format_sql: true
     show-sql: true
-
-server:
-  port: 8080
 ```
 
-DB와 사용자가 없다면 PostgreSQL 관리자 계정에서 아래 SQL을 실행합니다.
+초기 DB 생성 예:
 
 ```sql
 CREATE USER mesuser WITH PASSWORD 'mesuser';
 CREATE DATABASE sdmes OWNER mesuser;
 ALTER DATABASE sdmes SET timezone TO 'Asia/Seoul';
-```
-
-권한 문제가 생기면 아래 SQL도 실행합니다.
-
-```sql
 GRANT ALL PRIVILEGES ON DATABASE sdmes TO mesuser;
 GRANT USAGE, CREATE ON SCHEMA public TO mesuser;
 ```
 
 ## 샘플 데이터
 
-`SeedData.java`에서 서버 시작 시 샘플 데이터를 생성합니다.
+`SeedData.java`에서 서버 시작 시 데이터가 없으면 샘플 데이터를 생성합니다.
 
 기준정보:
 
@@ -311,82 +336,99 @@ GRANT USAGE, CREATE ON SCHEMA public TO mesuser;
 - `FAC01`: Conveyor Inspector 01
 - `FAC02`: Conveyor Inspector 02
 
-생산 계획:
+생산계획:
 
-- 오늘 날짜 기준
-- 공장: `PLT01`
-- 설비: `FAC01`
-- 목표 수량: `20`
-
-이미 데이터가 있으면 중복 저장하지 않습니다.
+- plantCode: `PLT01`
+- facilityId: `FAC01`
+- target amount: `20`
+- loadTime: `3`
 
 ## 실행 방법
 
 ### 1. PostgreSQL 실행
 
-로컬 PostgreSQL이 켜져 있어야 합니다.
+로컬 PostgreSQL이 실행 중이어야 합니다.
 
 기본 접속 정보:
 
-- host: `localhost`
-- port: `5432`
-- database: `sdmes`
-- username: `mesuser`
-- password: `mesuser`
-
-### 2. MQTT Broker 실행
-
-MQTT 기능을 테스트하려면 로컬 MQTT Broker가 필요합니다.
-
-예시:
-
 ```text
-tcp://localhost:1883
+host: localhost
+port: 5432
+database: sdmes
+username: mesuser
+password: mesuser
 ```
 
-Mosquitto를 사용한다면 1883 포트로 실행하면 됩니다.
+### 2. Mosquitto 실행
+
+MQTT Broker가 `tcp://localhost:1883`에서 실행 중이어야 합니다.
 
 ### 3. 백엔드 실행
 
-Windows:
+STS에서 `MesWebBackendApplication.java`를 Spring Boot App으로 실행합니다.
+
+또는 Gradle 프로젝트 구성이 정상화된 환경에서는 다음 명령을 사용할 수 있습니다.
 
 ```bash
 gradlew.bat bootRun
 ```
 
-Mac/Linux:
+### 4. 프론트 실행
 
-```bash
-./gradlew bootRun
-```
-
-STS에서는 `MesWebBackendApplication.java`를 Spring Boot App으로 실행합니다.
-
-## 프론트엔드 연동
-
-프론트엔드는 아래 백엔드 주소를 호출합니다.
+프론트 프로젝트 경로:
 
 ```text
-http://localhost:8080/api
+C:\Users\weakl\Documents\dev\mes-web-frontend
 ```
 
-현재 CORS는 Vue 개발 서버 주소를 허용합니다.
+실행:
 
-```java
-@CrossOrigin(origins = "http://localhost:5173")
+```bash
+npm install
+npm run dev
 ```
 
-Vue 개발 서버는 보통 아래 주소로 실행됩니다.
+기본 주소:
 
 ```text
 http://localhost:5173
 ```
 
-## 현재 개발 상태 메모
+## 테스트 순서
 
-- REST 방식 검사 결과 저장은 `MonitoringService.saveInspectionResult()`에서 처리합니다.
-- MQTT 방식 검사 결과 저장은 `InspectionService.process()`에서 처리합니다.
-- `MqtttService.publish()`는 현재 `"hello mqtt"`를 발행하는 테스트용 코드입니다.
-- 프론트엔드는 DB나 MQTT를 직접 알 필요가 없습니다. Spring API를 호출해서 현재 모니터링 상태만 받으면 됩니다.
-- 외부 설비 데이터가 들어왔을 때 화면을 갱신하는 방식은 우선 polling으로 시작하고, 이후 SSE 또는 WebSocket으로 확장할 수 있습니다.
+1. PostgreSQL 실행
+2. Mosquitto 실행
+3. Spring Boot 백엔드 실행
+4. Vue 프론트 실행
+5. 브라우저에서 `http://localhost:5173` 접속
+6. Schedule ID를 `1`로 둔 상태에서 `Start` 클릭
+7. Line Simulator가 반복 실행되는지 확인
+8. OK/FAIL 수량과 성공률이 SSE로 자동 갱신되는지 확인
+9. `Stop` 클릭 시 반복 실행이 중단되는지 확인
 
+### MQTT 메시지가 저장되지 않는 경우
+
+확인할 것:
+
+- Mosquitto가 `1883` 포트에서 실행 중인지
+- topic이 `mes/PLT01/FAC01/inspection` 형태인지
+- payload의 `plantCode`, `facilityId`가 topic과 일치하는지
+- `scheduleId`가 DB에 존재하는지
+
+## 현재 구현 범위
+
+- MQTT 수신 처리
+- 프론트 시뮬레이터에서 MQTT publish 트리거
+- PostgreSQL 검사 결과 저장
+- SSE 실시간 모니터링 갱신
+- 반복 Start / Stop 시뮬레이터 UI
+- Schedule / Setting 조회
+
+## 향후 개선 아이디어
+
+- 최근 검사 이력 API 추가
+- 설비별 상세 모니터링 화면 추가
+- MQTT publish 실패 시 프론트 에러 메시지 강화
+- 테스트 코드 추가
+- Gradle 프로젝트 구조 정리
+- 실제 설비 MQTT payload와 호환성 검증

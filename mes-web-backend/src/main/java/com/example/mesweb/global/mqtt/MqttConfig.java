@@ -18,6 +18,7 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 import org.springframework.messaging.MessagingException;
+import org.springframework.messaging.handler.annotation.Header;
 
 import com.example.mesweb.inspection.InspectionService;
 import com.example.mesweb.inspection.dto.InspectionMessage;
@@ -53,9 +54,9 @@ public class MqttConfig {
 	@Bean
 	@ServiceActivator(inputChannel = "mqttOutboundChannel")
 	public MessageHandler mqttOutBound() {
-	MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(clientId, mqttClientFactory());
+	MqttPahoMessageHandler messageHandler = new MqttPahoMessageHandler(clientId + "-outbound", mqttClientFactory());
 	messageHandler.setAsync(true);
-	messageHandler.setDefaultTopic(topic);
+	messageHandler.setDefaultTopic("mes/simulator/default/inspection");
 	return messageHandler;
 	}
 	
@@ -68,6 +69,7 @@ public class MqttConfig {
 	@MessagingGateway(defaultRequestChannel = "mqttOutboundChannel")
 	public interface myGateWay{
 		void sendToMqtt(String data);
+		void sendToMqtt(String data, @Header(MqttHeaders.TOPIC) String topic);
 	}
 	
 	@Bean

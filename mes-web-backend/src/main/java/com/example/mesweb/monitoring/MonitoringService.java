@@ -2,13 +2,11 @@ package com.example.mesweb.monitoring;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.mesweb.inspection.dto.InspectionMessage;
-import com.example.mesweb.inspection.dto.InspectionResultRequest;
 import com.example.mesweb.monitoring.dto.ControlMessage;
 import com.example.mesweb.monitoring.dto.MonitoringSummary;
 import com.example.mesweb.process.ProcessResult;
